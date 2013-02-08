@@ -20,6 +20,7 @@
 import datetime
 import functools
 import sys
+import uuid
 import traceback as _traceback
 import os as _os
 import logging as _logging
@@ -37,6 +38,7 @@ class Journal(_Journal):
         else:
             self.default_call = functools.partial(unicode, encoding='utf-8')
         self.call_dict = {
+            'MESSAGE_ID': uuid.UUID,
             'PRIORITY': int,
             'LEADER': int,
             'SESSION_ID': int,
