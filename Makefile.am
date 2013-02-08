@@ -3326,7 +3326,8 @@ EXTRA_DIST += \
 # ------------------------------------------------------------------------------
 if HAVE_PYTHON_DEVEL
 pkgpyexec_LTLIBRARIES = \
-	_journal.la
+	_journal.la \
+	_reader.la
 
 _journal_la_SOURCES = \
 	src/python-systemd/_journal.c
@@ -3345,6 +3346,25 @@ _journal_la_LDFLAGS = \
 _journal_la_LIBADD = \
 	$(PYTHON_LIBS) \
 	libsystemd-journal.la
+
+_reader_la_SOURCES = \
+	src/python-systemd/_reader.c
+
+_reader_la_CFLAGS = \
+	$(AM_CFLAGS) \
+        -fvisibility=default \
+	$(PYTHON_CFLAGS)
+
+_reader_la_LDFLAGS = \
+	$(AM_LDFLAGS) \
+	-shared \
+	-module \
+	-avoid-version
+
+_reader_la_LIBADD = \
+	$(PYTHON_LIBS) \
+	libsystemd-journal.la \
+	libsystemd-id128.la
 
 dist_pkgpyexec_PYTHON = \
 	src/python-systemd/journal.py \
