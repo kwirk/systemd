@@ -105,6 +105,11 @@ class Journal(_Journal):
                 result[key] = self._convert_field(key, value)
         return result
 
+    def add_match(self, *args, **kwargs):
+        args = list(args)
+        args.extend(_make_line(key, val) for key, val in kwargs.iteritems())
+        super(Journal, self).add_match(*args)
+
     def get_next(self, *args, **kwargs):
         return self._convert_entry(
             super(Journal, self).get_next(*args, **kwargs))

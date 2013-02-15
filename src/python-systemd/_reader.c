@@ -227,7 +227,7 @@ PyDoc_STRVAR(Journal_add_match__doc__,
 "Matches can be passed as strings \"field=value\", or keyword\n"
 "arguments field=\"value\".");
 static PyObject *
-Journal_add_match(Journal *self, PyObject *args, PyObject *keywds)
+Journal_add_match(Journal *self, PyObject *args)
 {
     Py_ssize_t arg_match_len;
     char *arg_match;
@@ -256,71 +256,6 @@ Journal_add_match(Journal *self, PyObject *args, PyObject *keywds)
         if (PyErr_Occurred())
             return NULL;
         r = sd_journal_add_match(self->j, arg_match, arg_match_len);
-        if (r == -EINVAL) {
-            PyErr_SetString(PyExc_ValueError, "Invalid match");
-            return NULL;
-        }else if (r == -ENOMEM) {
-            PyErr_SetString(PyExc_MemoryError, "Not enough memory");
-            return NULL;
-        }else if (r < 0) {
-            PyErr_SetString(PyExc_RuntimeError, "Error adding match");
-            return NULL;
-        }
-    }
-
-    if (! keywds)
-        Py_RETURN_NONE;
-
-    PyObject *key, *value;
-    Py_ssize_t pos=0, match_key_len, match_value_len;
-    int match_len;
-    char *match_key, *match_value;
-    void *match;
-    while (PyDict_Next(keywds, &pos, &key, &value)) {
-#if PY_MAJOR_VERSION >=3
-        if (PyUnicode_Check(key)) {
-#if PY_MINOR_VERSION >=3
-            match_key = PyUnicode_AsUTF8AndSize(key, &match_key_len);
-#else
-            PyObject *temp2;
-            temp2 = PyUnicode_AsUTF8String(key);
-            PyBytes_AsStringAndSize(temp2, &match_key, &match_key_len);
-            Py_DECREF(temp2);
-#endif
-        }else if (PyBytes_Check(key)) {
-            PyBytes_AsStringAndSize(key, &match_key, &match_key_len);
-        }else{
-            PyErr_SetString(PyExc_TypeError, "expected bytes or string");
-        }
-        if (PyUnicode_Check(value)) {
-#if PY_MINOR_VERSION >=3
-            match_value = PyUnicode_AsUTF8AndSize(value, &match_value_len);
-#else
-            PyObject *temp3;
-            temp3 = PyUnicode_AsUTF8String(value);
-            PyBytes_AsStringAndSize(temp3, &match_value, &match_value_len);
-            Py_DECREF(temp3);
-#endif
-        }else if (PyBytes_Check(value)) {
-            PyBytes_AsStringAndSize(value, &match_value, &match_value_len);
-        }else{
-            PyErr_SetString(PyExc_TypeError, "expected bytes or string");
-        }
-#else
-        PyString_AsStringAndSize(key, &match_key, &match_key_len);
-        PyString_AsStringAndSize(value, &match_value, &match_value_len);
-#endif
-        if (PyErr_Occurred())
-            return NULL;
-
-        match_len = match_key_len + 1 + match_value_len;
-        match = malloc(match_len);
-        memcpy(match, match_key, match_key_len);
-        memcpy(match + match_key_len, "=", 1);
-        memcpy(match + match_key_len + 1, match_value, match_value_len);
-
-        r = sd_journal_add_match(self->j, match, match_len);
-        free(match);
         if (r == -EINVAL) {
             PyErr_SetString(PyExc_ValueError, "Invalid match");
             return NULL;
@@ -798,7 +733,7 @@ static PyMethodDef Journal_methods[] = {
     Journal_get_next__doc__},
     {"get_previous", (PyCFunction)Journal_get_previous, METH_VARARGS,
     Journal_get_previous__doc__},
-    {"add_match", (PyCFunction)Journal_add_match, METH_VARARGS|METH_KEYWORDS,
+    {"add_match", (PyCFunction)Journal_add_match, METH_VARARGS,
     Journal_add_match__doc__},
     {"add_disjunction", (PyCFunction)Journal_add_disjunction, METH_NOARGS,
     Journal_add_disjunction__doc__},
