@@ -484,7 +484,6 @@ Journal_iternext(PyObject *self)
     }
 }
 
-#ifdef SD_JOURNAL_FOREACH_UNIQUE
 PyDoc_STRVAR(Journal_query_unique__doc__,
 "query_unique(field) -> a set of values\n\n"
 "Returns a set of unique values in journal for given `field`.\n"
@@ -523,7 +522,6 @@ Journal_query_unique(Journal *self, PyObject *args)
     }
     return value_set;
 }
-#endif //def SD_JOURNAL_FOREACH_UNIQUE
 
 static PyObject *
 Journal_get_data_threshold(Journal *self, void *closure)
@@ -606,10 +604,8 @@ static PyMethodDef Journal_methods[] = {
     Journal_wait__doc__},
     {"seek_cursor", (PyCFunction)Journal_seek_cursor, METH_VARARGS,
     Journal_seek_cursor__doc__},
-#ifdef SD_JOURNAL_FOREACH_UNIQUE
     {"query_unique", (PyCFunction)Journal_query_unique, METH_VARARGS,
     Journal_query_unique__doc__},
-#endif
     {NULL}  /* Sentinel */
 };
 
