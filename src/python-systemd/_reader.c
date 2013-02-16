@@ -97,7 +97,7 @@ Journal_get_next(Journal *self, PyObject *args)
         return NULL;
     }
 
-    int r;
+    int r = -EINVAL;
     Py_BEGIN_ALLOW_THREADS
     if (skip == 1LL) {
         r = sd_journal_next(self->j);
@@ -202,34 +202,20 @@ PyDoc_STRVAR(Journal_add_match__doc__,
 static PyObject *
 Journal_add_match(Journal *self, PyObject *args)
 {
-    PyObject *arg;
-    Py_ssize_t arg_match_len;
-    char *arg_match;
-    int i, r;
-    for (i = 0; i < PySequence_Size(args); i++) {
-        arg = PySequence_Fast_GET_ITEM(args, i);
-        if (PyUnicode_Check(arg)) {
-            PyObject *temp;
-            temp = PyUnicode_AsEncodedString(arg, "utf-8", "strict");
-            PyBytes_AsStringAndSize(temp, &arg_match, &arg_match_len);
-            Py_DECREF(temp);
-        }else if (PyBytes_Check(arg)) {
-            PyBytes_AsStringAndSize(arg, &arg_match, &arg_match_len);
-        }else{
-            PyErr_SetString(PyExc_TypeError, "expected bytes, unicode or string");
-        }
-        if (PyErr_Occurred())
-            return NULL;
+    char *match;
+    int match_len;
+    if (! PyArg_ParseTuple(args, "s#", &match, &match_len))
+        return NULL;
 
-        r = sd_journal_add_match(self->j, arg_match, arg_match_len);
-        if (r < 0) {
-            errno = -r;
-            PyObject *errtype = r == -EINVAL ? PyExc_ValueError :
-                                r == -ENOMEM ? PyExc_MemoryError :
-                                PyExc_OSError;
-            PyErr_SetFromErrno(errtype);
-            return NULL;
-        }
+    int r;
+    r = sd_journal_add_match(self->j, match, match_len);
+    if (r < 0) {
+        errno = -r;
+        PyObject *errtype = r == -EINVAL ? PyExc_ValueError :
+                            r == -ENOMEM ? PyExc_MemoryError :
+                            PyExc_OSError;
+        PyErr_SetFromErrno(errtype);
+        return NULL;
     }
 
     Py_RETURN_NONE;
