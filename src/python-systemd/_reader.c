@@ -127,31 +127,27 @@ Journal_get_next(Journal *self, PyObject *args)
     const void *msg;
     size_t msg_len;
     const char *delim_ptr;
-    PyObject *key, *value, *cur_value, *tmp_list;
+    char *key;
+    PyObject *value, *cur_value, *tmp_list;
 
     SD_JOURNAL_FOREACH_DATA(self->j, msg, msg_len) {
         delim_ptr = memchr(msg, '=', msg_len);
-#if PY_MAJOR_VERSION >=3
-        key = PyUnicode_FromStringAndSize(msg, delim_ptr - (const char*) msg);
-#else
-        key = PyString_FromStringAndSize(msg, delim_ptr - (const char*) msg);
-#endif
+        key = strndup(msg, delim_ptr - (const char*) msg);
         value = PyBytes_FromStringAndSize(delim_ptr + 1, (const char*) msg + msg_len - (delim_ptr + 1) );
-        if (PyDict_Contains(dict, key)) {
-            cur_value = PyDict_GetItem(dict, key);
+        cur_value = PyDict_GetItemString(dict, key);
+        if (cur_value) {
             if (PyList_CheckExact(cur_value)) {
                 PyList_Append(cur_value, value);
             }else{
                 tmp_list = PyList_New(0);
                 PyList_Append(tmp_list, cur_value);
                 PyList_Append(tmp_list, value);
-                PyDict_SetItem(dict, key, tmp_list);
+                PyDict_SetItemString(dict, key, tmp_list);
                 Py_DECREF(tmp_list);
             }
         }else{
-            PyDict_SetItem(dict, key, value);
+            PyDict_SetItemString(dict, key, value);
         }
-        Py_DECREF(key);
         Py_DECREF(value);
     }
 
@@ -159,15 +155,8 @@ Journal_get_next(Journal *self, PyObject *args)
     if (sd_journal_get_realtime_usec(self->j, &realtime) == 0) {
         char realtime_str[20];
         sprintf(realtime_str, "%llu", (long long unsigned) realtime);
-
-#if PY_MAJOR_VERSION >=3
-        key = PyUnicode_FromString("__REALTIME_TIMESTAMP");
-#else
-        key = PyString_FromString("__REALTIME_TIMESTAMP");
-#endif
         value = PyBytes_FromString(realtime_str);
-        PyDict_SetItem(dict, key, value);
-        Py_DECREF(key);
+        PyDict_SetItemString(dict, "__REALTIME_TIMESTAMP", value);
         Py_DECREF(value);
     }
 
@@ -176,29 +165,16 @@ Journal_get_next(Journal *self, PyObject *args)
     if (sd_journal_get_monotonic_usec(self->j, &monotonic, &sd_id) == 0) {
         char monotonic_str[20];
         sprintf(monotonic_str, "%llu", (long long unsigned) monotonic);
-#if PY_MAJOR_VERSION >=3
-        key = PyUnicode_FromString("__MONOTONIC_TIMESTAMP");
-#else
-        key = PyString_FromString("__MONOTONIC_TIMESTAMP");
-#endif
         value = PyBytes_FromString(monotonic_str);
-
-        PyDict_SetItem(dict, key, value);
-        Py_DECREF(key);
+        PyDict_SetItemString(dict, "__MONOTONIC_TIMESTAMP", value);
         Py_DECREF(value);
     }
 
     char *cursor;
     if (sd_journal_get_cursor(self->j, &cursor) > 0) { //Should return 0...
-#if PY_MAJOR_VERSION >=3
-        key = PyUnicode_FromString("__CURSOR");
-#else
-        key = PyString_FromString("__CURSOR");
-#endif
         value = PyBytes_FromString(cursor);
-        PyDict_SetItem(dict, key, value);
+        PyDict_SetItemString(dict, "__CURSOR", value);
         free(cursor);
-        Py_DECREF(key);
         Py_DECREF(value);
     }
 
@@ -229,32 +205,25 @@ PyDoc_STRVAR(Journal_add_match__doc__,
 static PyObject *
 Journal_add_match(Journal *self, PyObject *args)
 {
+    PyObject *arg;
     Py_ssize_t arg_match_len;
     char *arg_match;
     int i, r;
     for (i = 0; i < PySequence_Size(args); i++) {
-#if PY_MAJOR_VERSION >=3
-        PyObject *arg;
         arg = PySequence_Fast_GET_ITEM(args, i);
         if (PyUnicode_Check(arg)) {
-#if PY_MINOR_VERSION >=3
-            arg_match = PyUnicode_AsUTF8AndSize(arg, &arg_match_len);
-#else
             PyObject *temp;
-            temp = PyUnicode_AsUTF8String(arg);
+            temp = PyUnicode_AsEncodedString(arg, "utf-8", "strict");
             PyBytes_AsStringAndSize(temp, &arg_match, &arg_match_len);
             Py_DECREF(temp);
-#endif
         }else if (PyBytes_Check(arg)) {
             PyBytes_AsStringAndSize(arg, &arg_match, &arg_match_len);
         }else{
-            PyErr_SetString(PyExc_TypeError, "expected bytes or string");
+            PyErr_SetString(PyExc_TypeError, "expected bytes, unicode or string");
         }
-#else
-        PyString_AsStringAndSize(PySequence_Fast_GET_ITEM(args, i), &arg_match, &arg_match_len);
-#endif
         if (PyErr_Occurred())
             return NULL;
+
         r = sd_journal_add_match(self->j, arg_match, arg_match_len);
         if (r == -EINVAL) {
             PyErr_SetString(PyExc_ValueError, "Invalid match");
@@ -372,11 +341,11 @@ Journal_seek_realtime(Journal *self, PyObject *args)
         temp = PyObject_CallMethod(arg, "strftime", "s", "%s%f");
 #if PY_MAJOR_VERSION >=3
         PyObject *temp2;
-        temp2 = PyUnicode_AsUTF8String(temp);
+        temp2 = PyUnicode_AsEncodedString(temp, "utf-8", "strict");
         timestamp_str = PyBytes_AsString(temp2);
         Py_DECREF(temp2);
 #else
-        timestamp_str = PyString_AsString(temp);
+        timestamp_str = PyBytes_AsString(temp);
 #endif
         Py_DECREF(temp);
         timestamp = strtoull(timestamp_str, NULL, 10);
@@ -586,14 +555,8 @@ Journal_query_unique(Journal *self, PyObject *args)
     const void *uniq;
     size_t uniq_len;
     const char *delim_ptr;
-    PyObject *value_set, *key, *value;
+    PyObject *value_set, *value;
     value_set = PySet_New(0);
-
-#if PY_MAJOR_VERSION >=3
-    key = PyUnicode_FromString(query);
-#else
-    key = PyString_FromString(query);
-#endif
 
     SD_JOURNAL_FOREACH_UNIQUE(self->j, uniq, uniq_len) {
         delim_ptr = memchr(uniq, '=', uniq_len);
@@ -601,7 +564,6 @@ Journal_query_unique(Journal *self, PyObject *args)
         PySet_Add(value_set, value);
         Py_DECREF(value);
     }
-    Py_DECREF(key);
     return value_set;
 }
 #endif //def SD_JOURNAL_FOREACH_UNIQUE
