@@ -287,7 +287,7 @@ Journal_seek(Journal *self, PyObject *args, PyObject *keywds)
                                       &offset, &whence))
         return NULL;
 
-    PyObject *arg;
+    PyObject *result=NULL;
     if (whence == SEEK_SET){
         int r;
         Py_BEGIN_ALLOW_THREADS
@@ -298,10 +298,10 @@ Journal_seek(Journal *self, PyObject *args, PyObject *keywds)
             return NULL;
         }
         if (offset > 0LL) {
-            Py_DECREF(PyObject_CallMethod((PyObject *)self, "get_next", "L", offset));
+            result = PyObject_CallMethod((PyObject *)self, "get_next", "L", offset);
         }
     }else if (whence == SEEK_CUR){
-        Py_DECREF(PyObject_CallMethod((PyObject *)self, "get_next", "L", offset));
+        result = PyObject_CallMethod((PyObject *)self, "get_next", "L", offset);
     }else if (whence == SEEK_END){
         int r;
         Py_BEGIN_ALLOW_THREADS
@@ -311,14 +311,19 @@ Journal_seek(Journal *self, PyObject *args, PyObject *keywds)
             PyErr_SetString(PyExc_RuntimeError, "Error seeking to tail");
             return NULL;
         }
-        Py_DECREF(PyObject_CallMethod((PyObject *)self, "get_next", "L", -1LL));
         if (offset < 0LL) {
-            Py_DECREF(PyObject_CallMethod((PyObject *)self, "get_next", "L", offset));
+            result = PyObject_CallMethod((PyObject *)self, "get_next", "L", offset);
+        }else{
+            result = PyObject_CallMethod((PyObject *)self, "get_next", "L", -1LL);
         }
     }else{
         PyErr_SetString(PyExc_ValueError, "Invalid value for whence");
-        return NULL;
     }
+
+    if (result)
+        Py_DECREF(result);
+    if (PyErr_Occurred())
+        return NULL;
     Py_RETURN_NONE;
 }
 
@@ -511,7 +516,7 @@ Journal_iter(PyObject *self)
 static PyObject *
 Journal_iternext(PyObject *self)
 {
-    PyObject *dict, *arg;
+    PyObject *dict;
     Py_ssize_t dict_size;
 
     dict = PyObject_CallMethod(self, "get_next", "");
