@@ -76,21 +76,34 @@ else:
     _convert_unicode = _functools.partial(unicode, encoding='utf-8')
 
 class Journal(_Journal):
-    def __init__(self, converters=None, *args, **kwargs):
-        super(Journal, self).__init__(*args, **kwargs)
-        if sys.version_info >= (3,3):
+    def __init__(self, converters=None, flags=LOCAL_ONLY, path=None):
+        """Creates instance of Journal, which allows filtering and
+        return of journal entries.
+        Argument `converters` is a dictionary which updates the
+        DEFAULT_CONVERTERS to convert journal field values.
+        Argument `flags` sets open flags of the journal, which can be one
+        of, or ORed combination of constants: LOCAL_ONLY (default) opens
+        journal on local machine only; RUNTIME_ONLY opens only
+        volatile journal files; and SYSTEM_ONLY opens only
+        journal files of system services and the kernel.
+        Argument `path` is the directory of journal files. Note that
+        currently flags are ignored when `path` is present as they are
+        currently not relevant.
+        """
+        super(Journal, self).__init__(flags, path)
         if _sys.version_info >= (3,3):
             self.converters = ChainMap()
             if converters is not None:
                 self.converters.maps.append(converters)
             self.converters.maps.append(DEFAULT_CONVERTERS)
         else:
-            # suitable fallback, e.g.
             self.converters = DEFAULT_CONVERTERS.copy()
             if converters is not None:
                 self.converters.update(converters)
 
     def _convert_field(self, key, value):
+        """ Convert value based on callable from self.converters
+        based of field/key"""
         try:
             result = self.converters[key](value)
         except:
@@ -103,6 +116,7 @@ class Journal(_Journal):
         return result
 
     def _convert_entry(self, entry):
+        """ Convert entire journal entry utilising _covert_field"""
         result = {}
         for key, value in entry.items():
             if isinstance(value, list):
@@ -112,31 +126,54 @@ class Journal(_Journal):
         return result
 
     def add_match(self, *args, **kwargs):
+        """Add one or more matches to the filter journal log entries.
+        All matches of different field are combined in a logical AND,
+        and matches of the smae field are automatically combined in a
+        logical OR.
+        Matches can be passed as strings of form "field=value", or
+        keyword arguments field="value"."""
         args = list(args)
         args.extend(_make_line(key, val) for key, val in kwargs.items())
         for arg in args:
             super(Journal, self).add_match(arg)
 
     def get_next(self, skip=1):
+        """Return dictionary of the next log entry. Optional skip value
+        will return the `skip`th log entry.
+        Returned will be journal entry dictionary processed with
+        converters."""
         return self._convert_entry(
             super(Journal, self).get_next(skip))
 
-    def query_unique(self, key):
-        return set(self._convert_field(key, value)
-            for value in super(Journal, self).query_unique(key))
+    def query_unique(self, field):
+        """Returns a set of unique values in journal for given `field`,
+        processed with converters.
+        Note this does not respect any journal matches."""
+        return set(self._convert_field(field, value)
+            for value in super(Journal, self).query_unique(field))
 
-    def seek_realtime(self, timestamp):
+    def seek_realtime(self, realtime):
+        """Seek to nearest matching journal entry to `realtime`.
+        Argument `realtime` can must be either an integer unix timestamp
+        or datetime.datetime instance."""
         if isinstance(realtime, _datetime.datetime):
-            timestamp = float(timestamp.strftime("%s.%f"))
-        return super(Journal, self).seek_realtime(timestamp)
+            realtime = float(realtime.strftime("%s.%f"))
+        return super(Journal, self).seek_realtime(realtime)
 
-    def seek_monotonic(self, timestamp, bootid=None):
+    def seek_monotonic(self, monotonic, bootid=None):
+        """Seek to nearest matching journal entry to `monotonic`.
+        Argument `monotonic` is a timestamp from boot in either seconds
+        or a datetime.timedelta instance.
+        Argument `bootid` is a string or UUID representing which boot the
+        monotonic time is reference to. Defaults to current bootid."""
         if isinstance(monotonic, _datetime.timedelta):
-            timestamp = timestamp.totalseconds()
-        return super(Journal, self).seek_monotonic(timestamp, bootid)
+            monotonic = monotonic.totalseconds()
+        if isinstance(bootid, _uuid.UUID):
+            bootid = bootid.get_hex()
+        return super(Journal, self).seek_monotonic(monotonic, bootid)
 
     def log_level(self, level):
-        """Sets maximum log level by setting matches for PRIORITY."""
+        """Sets maximum log `level` by setting matches for PRIORITY."""
         if 0 <= level <= 7:
             for i in range(level+1):
                 self.add_match(PRIORITY="%s" % i)
@@ -144,6 +181,10 @@ class Journal(_Journal):
             raise ValueError("Log level must be 0 <= level <= 7")
 
     def this_boot(self, bootid=None):
+        """Sets match filter for log entries for specified `bootid`
+        If `bootid` is None, current boot ID is used, else `bootid`
+        must be string or UUID instance.
+        Equivalent to add_match(_BOOT_ID=`bootid`)."""
         if bootid is None:
             #TODO: bootid = id128.get_boot()
             raise NotImplementedError
@@ -152,6 +193,10 @@ class Journal(_Journal):
         self.add_match(_BOOT_ID=bootid)
 
     def this_machine(self, machineid):
+        """Sets match filter for log entries for specified `machineid`
+        If `machineid` is None, current machine ID is used, else
+        `machineid` must be string or UUID instance.
+        Equivalent to add_match(_MACHINE_ID=`machineid`)."""
         if machineid is None:
             #TODO: id128.get_machine()
             raise NotImplementedError
