@@ -139,13 +139,21 @@ class Journal(_Journal):
         else:
             raise ValueError("Log level must be 0 <= level <= 7")
 
-    def this_boot(self):
-        #TODO: self.add_match(_BOOT_ID=id128.get_boot().get_hex())
-        raise NotImplementedError
+    def this_boot(self, bootid=None):
+        if bootid is None:
+            #TODO: bootid = id128.get_boot()
+            raise NotImplementedError
+        if isinstance(bootid, _uuid.UUID):
+            bootid = bootid.get_hex()
+        self.add_match(_BOOT_ID=bootid)
 
-    def this_machine(self):
-        #TODO: self.add_match(_MACHINE_ID=id128.get_machine().get_hex())
-        raise NotImplementedError
+    def this_machine(self, machineid):
+        if machineid is None:
+            #TODO: id128.get_machine()
+            raise NotImplementedError
+        if isinstance(machineid, _uuid.UUID):
+            machineid = machineid.get_hex()
+        self.add_match(_MACHINE_ID=machineid)
 
 def _make_line(field, value):
         if isinstance(value, bytes):
