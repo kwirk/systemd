@@ -33,6 +33,10 @@ from ._journal import sendv, stream_fd
 from ._reader import (_Journal, NOP, APPEND, INVALIDATE,
                       LOCAL_ONLY, RUNTIME_ONLY, SYSTEM_ONLY)
 
+#TODO: id128 machine and boot constants (remeber import above)
+#CURRENT_MACHINE = id128.get_machine()
+#CURRENT_BOOT = id128.get_boot()
+
 _MONOTONIC_CONVERTER = lambda x: _datetime.timedelta(microseconds=float(x))
 _REALTIME_CONVERTER = lambda x: _datetime.datetime.fromtimestamp(float(x)/1E6)
 DEFAULT_CONVERTERS = {
@@ -172,7 +176,7 @@ class Journal(_Journal):
             bootid = bootid.get_hex()
         return super(Journal, self).seek_monotonic(monotonic, bootid)
 
-    def log_level(self, level):
+    def add_loglevel_matches(self, level):
         """Sets maximum log `level` by setting matches for PRIORITY."""
         if 0 <= level <= 7:
             for i in range(level+1):
@@ -180,7 +184,7 @@ class Journal(_Journal):
         else:
             raise ValueError("Log level must be 0 <= level <= 7")
 
-    def messageid_match(self, messageid):
+    def add_messageid_match(self, messageid):
         """Sets match filter for log entries for specified `messageid`.
         `messageid` can be string or UUID instance.
         Standard message IDs can be found in systemd.id128
@@ -189,26 +193,20 @@ class Journal(_Journal):
             messageid = messageid.get_hex()
         self.add_match(MESSAGE_ID=messageid)
 
-    def this_boot(self, bootid=None):
+    def add_boot_match(self, bootid):
         """Sets match filter for log entries for specified `bootid`
-        If `bootid` is None, current boot ID is used, else `bootid`
-        must be string or UUID instance.
+        Argument `bootid` must be string or UUID instance.
+        CURRENT_BOOT constant can be used for current system boot.
         Equivalent to add_match(_BOOT_ID=`bootid`)."""
-        if bootid is None:
-            #TODO: bootid = id128.get_boot()
-            raise NotImplementedError
         if isinstance(bootid, _uuid.UUID):
             bootid = bootid.get_hex()
         self.add_match(_BOOT_ID=bootid)
 
-    def this_machine(self, machineid):
+    def add_machine_match(self, machineid):
         """Sets match filter for log entries for specified `machineid`
-        If `machineid` is None, current machine ID is used, else
-        `machineid` must be string or UUID instance.
+        Argument `machineid` must be string or UUID instance.
+        CURRENT_MACHINE constant can be used to match the current system.
         Equivalent to add_match(_MACHINE_ID=`machineid`)."""
-        if machineid is None:
-            #TODO: id128.get_machine()
-            raise NotImplementedError
         if isinstance(machineid, _uuid.UUID):
             machineid = machineid.get_hex()
         self.add_match(_MACHINE_ID=machineid)
